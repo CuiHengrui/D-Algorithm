@@ -86,7 +86,7 @@ class SACAgent:
         self.gamma = gamma
         self.tau = tau
         self.action_dim = action_dim
-        self.beta = 0.5  # 目标函数中的β参数
+        self.beta = 1  # 目标函数中的β参数
         self.min_range = -10.0  # 量化范围最小值
         self.max_range = 10.0  # 量化范围最大值
 
