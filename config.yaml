@@ -144,7 +144,7 @@ trainer:
     max_concurrency: 5
 
     # The target accuracy
-    target_accuracy: 0.995
+    target_accuracy: 0.95
 
     # The machine learning model
     model_name: lenet5
