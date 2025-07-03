@@ -90,6 +90,10 @@ class SACAgent:
         self.min_range = -10.0  # 量化范围最小值
         self.max_range = 10.0  # 量化范围最大值
 
+        self.target_entropy = -0.5 * torch.tensor(action_dim)  # 目标熵(β=0.7时适度降低)
+        self.log_alpha = torch.tensor([0.0], requires_grad=True)  # 可学习的log_α
+        self.alpha_optimizer = optim.Adam([self.log_alpha], lr=lr)
+
     def update(self, batch):
         states, actions, rewards, next_states, dones = zip(*batch)
 
@@ -135,6 +139,16 @@ class SACAgent:
         policy_loss.backward()
         self.policy_optimizer.step()
 
+        #  新增α优化步骤（核心修改）
+        alpha = self.log_alpha.exp().detach()  # 计算当前α值
+        policy_loss = (-min_q - alpha * entropy).mean()  # 使用α的policy_loss
+
+        # 计算α的损失并更新
+        alpha_loss = -self.log_alpha * (entropy.detach() + self.target_entropy).mean()
+        self.alpha_optimizer.zero_grad()
+        alpha_loss.backward()
+        self.alpha_optimizer.step()
+
         # 更新目标网络
         for target_param, param in zip(self.target_q_net1.parameters(), self.q_net1.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
@@ -166,7 +180,7 @@ class Server(fedavg.Server):
             )
 
         # === 添加强化学习组件 ===
-        self.strategies = ['2', '4', '8', '16', '32']
+        self.strategies = ['4', '8', '16', '32']
         self.action_dim = len(self.strategies)
 
         # 状态维度: [带宽, 梯度最大值, 梯度最小值, 当前轮次]
@@ -174,6 +188,9 @@ class Server(fedavg.Server):
         self.agent = SACAgent(self.state_dim, self.action_dim)
         self.replay_buffer = ReplayBuffer(capacity=10000)
         self.batch_size = 32
+
+        self.actual_grad_min = float('inf')  # 动态最小值
+        self.actual_grad_max = float('-inf')  # 动态最大值
 
     def configure(self) -> None:
         return super().configure()
@@ -183,6 +200,10 @@ class Server(fedavg.Server):
         self.flags = []
         states = []
         actions = []
+
+        # === 新增：根据β值动态调整目标熵 ===
+        beta_factor = 1.0 - self.agent.beta  # β=0.7 → 0.3
+        self.agent.target_entropy = -torch.log(torch.tensor(self.action_dim)) * (0.5 + 0.3 * beta_factor)
 
         # 1.为每个客户端选择策略
         for i, report in enumerate(reports):
@@ -269,10 +290,18 @@ class Server(fedavg.Server):
         min_g = report.grad_min
         round_normalized = self.current_round / self.config.trainer.rounds
 
+        # 动态更新范围
+        self.actual_grad_min = min(self.actual_grad_min, report.grad_min)
+        self.actual_grad_max = max(self.actual_grad_max, report.grad_max)
+
         # 归一化处理
         bandwidth_norm = bandwidth / self.B
-        max_g_norm = (max_g - self.agent.min_range) / (self.agent.max_range - self.agent.min_range + 1e-8)
-        min_g_norm = (min_g - self.agent.min_range) / (self.agent.max_range - self.agent.min_range + 1e-8)
+        # max_g_norm = (max_g - self.agent.min_range) / (self.agent.max_range - self.agent.min_range + 1e-8)
+        # min_g_norm = (min_g - self.agent.min_range) / (self.agent.max_range - self.agent.min_range + 1e-8)
+
+        # 使用动态范围归一化
+        max_g_norm = (report.grad_min - self.actual_grad_min) / (self.actual_grad_max - self.actual_grad_min + 1e-8)
+        min_g_norm = (report.grad_min - self.actual_grad_min) / (self.actual_grad_max - self.actual_grad_min + 1e-8)
 
         return np.array([bandwidth_norm, max_g_norm, min_g_norm, round_normalized])
 
