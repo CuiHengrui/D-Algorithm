@@ -86,7 +86,7 @@ class SACAgent:
         self.gamma = gamma
         self.tau = tau
         self.action_dim = action_dim
-        self.beta = 1  # 目标函数中的β参数
+        self.beta = 0.3  # 目标函数中的β参数
         self.min_range = -10.0  # 量化范围最小值
         self.max_range = 10.0  # 量化范围最大值
 
@@ -219,7 +219,7 @@ class Server(fedavg.Server):
                 squared_sum = 0
 
             denominator = 0.4 * ((2 ** bits_num) - 1) ** 2
-            part1 = squared_sum / (denominator + 1e-8)  # 防止除以0
+            part1 =(1 - self.agent.beta) * squared_sum / (denominator + 1e-8)  # 防止除以0
 
             # 第二部分: β * (bits_num / bandwidth)
             bandwidth = report.bandwidth
