@@ -156,12 +156,13 @@ class Server(fedavg.Server):
         self.config: Config = Config()
         self.alpha = self.config.algorithm.alpha
         self.B = self.config.algorithm.B
+        self.flags = []
 
         os.makedirs("./results/cost", exist_ok=True)
         self.record_file = f"./results/cost/{os.getpid()}.csv"
         with open(self.record_file, "w") as f:
             print(
-                "round,total_time,compute_time,communication_time,communication_cost,", file=f
+                "round,total_time,compute_time,communication_time,communication_cost,flgas,flags_sum", file=f
             )
 
         # === 添加强化学习组件 ===
@@ -179,7 +180,7 @@ class Server(fedavg.Server):
 
     def LQM(self, reports: list[SimpleNamespace]) -> list[str]:
         """使用强化学习生成LQM结果的筛选结果"""
-        flags = []
+        self.flags = []
         states = []
         actions = []
 
@@ -195,12 +196,12 @@ class Server(fedavg.Server):
 
             # 记录选择的策略
             strategy = self.strategies[action]
-            flags.append(strategy)
+            self.flags.append(strategy)
 
         # 2. 计算奖励（目标函数g的最小化）
         for i, report in enumerate(reports):
             # 获取选定的量化策略
-            selected_strategy = flags[i]
+            selected_strategy = self.flags[i]
             bits_num = int(selected_strategy)
 
             # === 使用公式g计算目标函数值 ===
@@ -240,8 +241,9 @@ class Server(fedavg.Server):
             batch = self.replay_buffer.sample(self.batch_size)
             self.agent.update(batch)
 
-        logging.info(f"round {self.current_round} flags {flags}")
-        return flags
+        logging.info(f"round {self.current_round} flags {self.flags}")
+        logging.info(f"round {self.current_round} flags_sum {sum([int(f) for f in self.flags])}")
+        # return flags
 
     def quantization_error(self, value, bits, min_val, max_val):
         """计算量化误差"""
@@ -292,12 +294,12 @@ class Server(fedavg.Server):
                 key: report.statistical_utility for key in deltas_received[i]
             }
 
-        flags = self.LQM(reports)
+        self.LQM(reports)
         weights = []
 
         choosen_client_report = []
         for i, decompressed in enumerate(deltas_received):
-            if flag := flags[i]:
+            if flag := self.flags[i]:
                 weights.append(decompressed[flag])
                 reports[i].quantize_n = int(flag)
                 choosen_client_report.append(reports[i])
@@ -334,6 +336,6 @@ class Server(fedavg.Server):
 
         with open(self.record_file, "a") as f:
             print(
-                f"{self.current_round},{total_time},{compute_time_total},{communication_time},{communication_cost}",
+                f"{self.current_round},{total_time},{compute_time_total},{communication_time},{communication_cost},{self.flags},{sum([int(f) for f in self.flags])}",
                 file=f,
             )
