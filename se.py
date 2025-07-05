@@ -86,7 +86,7 @@ class SACAgent:
         self.gamma = gamma
         self.tau = tau
         self.action_dim = action_dim
-        self.beta = 0.7  # 目标函数中的β参数
+        self.beta = 0.9  # 目标函数中的β参数
         self.min_range = -10.0  # 量化范围最小值
         self.max_range = 10.0  # 量化范围最大值
 
@@ -141,10 +141,10 @@ class SACAgent:
 
         #  新增α优化步骤（核心修改）
         alpha = self.log_alpha.exp().detach()  # 计算当前α值
-        policy_loss = (-min_q - alpha * entropy).mean()  # 使用α的policy_loss
+        policy_loss = (-min_q - 0.5 * alpha * entropy).mean()  # 使用α的policy_loss
 
         # 计算α的损失并更新
-        alpha_loss = -self.log_alpha * (entropy.detach() + self.target_entropy).mean()
+        alpha_loss = -self.log_alpha * (entropy.detach() + 1.2 * self.target_entropy).mean()
         self.alpha_optimizer.zero_grad()
         alpha_loss.backward()
         self.alpha_optimizer.step()
@@ -203,7 +203,7 @@ class Server(fedavg.Server):
 
         # === 新增：根据β值动态调整目标熵 ===
         beta_factor = 1.0 - self.agent.beta  # β=0.7 → 0.3
-        self.agent.target_entropy = -torch.log(torch.tensor(self.action_dim)) * (0.5 + 0.3 * beta_factor)
+        self.agent.target_entropy = -torch.log(torch.tensor(self.action_dim)) * (0.5 + 0.1 * beta_factor)
 
         # 1.为每个客户端选择策略
         for i, report in enumerate(reports):
@@ -251,7 +251,7 @@ class Server(fedavg.Server):
             q_value = self.agent.beta * part1 + (1 -self.agent.beta) * part2
 
             # 由于我们希望最小化q_value，因此奖励为负值
-            reward = -q_value
+            reward = -q_value + 0.05 * bits_num
 
             # 添加到经验回放缓冲区
             # 下一状态可以简单设为当前状态（因为状态转移不明确）
