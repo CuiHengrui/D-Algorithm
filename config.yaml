@@ -122,10 +122,15 @@ server:
 
 data:
     # The training and testing dataset
-    datasource: CIFAR10
+    # datasource: CIFAR10
+    # datasource: CIFAR100
+    datasource: TinyImageNet
+    # datasource: MNIST
+    # datasource: EMNIST
 
     # Where the dataset is located
-    data_path: ./data
+    # data_path: ./data
+    data_path: ./data/tiny-imagenet-200
 
     # Number of samples in each partition
     min_partition_size: 2000
@@ -147,9 +152,12 @@ trainer:
     target_accuracy: 0.95
 
     # The machine learning model
-    model_name: resnet_18
-#    model_type: torch_hub
-#    model_name: inception_v3
+    # model_name: resnet_18
+    # model_name: resnet_152
+
+    model_type: torch_hub
+    model_name: inception_v3
+    
 
 
     # Number of epoches for local training in each communication round
@@ -167,7 +175,11 @@ algorithm:
 
 parameters:
     model:
-        num_classes: 10
+        # num_classes: 10
+        # num_classes: 47
+        num_classes: 200
+        # num_classes: 10
+        # num_classes: 10
     optimizer:
         lr: 0.001
         momentum: 0.9
