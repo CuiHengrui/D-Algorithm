@@ -37,12 +37,13 @@ class Trainer(basic.Trainer):
 
         outputs = self.model(examples)
 
-        # 原始代码
-        # loss = self._loss_criterion(outputs, labels)
-
-        # 修改代码（针对inception_v3）
-        logits = outputs.logits
-        loss = self._loss_criterion(logits, labels)
+        if config.model_name == "inception_v3":
+                    # 修改代码（针对inception_v3）
+            logits = outputs.logits
+            loss = self._loss_criterion(logits, labels)
+        else:
+            # 原始代码
+            loss = self._loss_criterion(outputs, labels)
 
         self._loss_tracker.update(loss, labels.size(0))
 
