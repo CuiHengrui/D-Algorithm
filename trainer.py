@@ -57,15 +57,33 @@ class Trainer(basic.Trainer):
         return loss
 
 
-    def test(self, testset, sampler=None):
+    def test_model(self, config, testset, sampler=None, **kwargs):
         """
         重载父类方法，针对inception_v3修改
         """
+        batch_size = config["batch_size"]
 
-        # Deactivate the cut layer so that testing uses all the layers
-        self.mindspore_model._network.cut_layer = None
+        test_loader = torch.utils.data.DataLoader(
+            testset, batch_size=batch_size, shuffle=False, sampler=sampler
+        )
 
-        accuracy = self.mindspore_model.eval(testset)
+        correct = 0
+        total = 0
 
-        self.pause_training()
-        return accuracy["Accuracy"]
+        self.model.to(self.device)
+        with torch.no_grad():
+            for examples, labels in test_loader:
+                examples, labels = examples.to(self.device), labels.to(self.device)
+
+                outputs = self.model(examples)
+
+                outputs = self.process_outputs(outputs)
+
+                if config["model_name"] == "inception_v3":
+                    outputs = outputs.logits
+
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+        return correct / total
