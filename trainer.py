@@ -55,3 +55,17 @@ class Trainer(basic.Trainer):
         self.optimizer.step()
 
         return loss
+
+
+    def test(self, testset, sampler=None):
+        """
+        重载父类方法，针对inception_v3修改
+        """
+
+        # Deactivate the cut layer so that testing uses all the layers
+        self.mindspore_model._network.cut_layer = None
+
+        accuracy = self.mindspore_model.eval(testset)
+
+        self.pause_training()
+        return accuracy["Accuracy"]

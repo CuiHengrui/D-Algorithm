@@ -147,7 +147,7 @@ trainer:
     target_accuracy: 0.95
 
     # The machine learning model
-    model_name: resnet_5
+    model_name: lenet5
     
 
 
