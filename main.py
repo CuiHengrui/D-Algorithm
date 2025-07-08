@@ -23,7 +23,7 @@ def main():
     trainer = Trainer
     if Config.trainer.model_name == "inception_v3":
         datasource = CustomDataSource
-        model = inception_v3(num_classes=200, aux_logits=True)
+        model = partial(inception_v3, num_classes=200, aux_logits=True)
         client = Client(model=model,datasource=datasource, trainer=trainer)
         server = Server(model=model, datasource=datasource, trainer=trainer) 
     else:
