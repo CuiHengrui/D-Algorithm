@@ -66,5 +66,6 @@ class Trainer(basic.Trainer):
         重写 basie.Trainer 中的 get_train_loader 方法
         """
         return torch.utils.data.DataLoader(
-            dataset=trainset, shuffle=False, batch_size=batch_size, sampler=sampler, drop_last=True # 防止 BN 层报错
+            dataset=trainset, shuffle=False, batch_size=batch_size, sampler=sampler, drop_last=True, pin_memory=True, 
+            num_workers=4 # 防止 BN 层报错
         )
