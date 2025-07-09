@@ -39,6 +39,9 @@ class Trainer(basic.Trainer):
         if config["model_name"] == "inception_v3":
             # 修改代码（针对inception_v3）
             logits, aux_logits = outputs.logits, outputs.aux_logits
+            # 判断logits中是否有nan，如果有，抛出异常
+            if torch.isnan(logits).any():
+                raise ValueError("logits 中存在 NaN 值，训练终止。")
             # 在原文中，总的损失为 1*主分类器损失 + 0.3*辅助分类器损失
             loss = self._loss_criterion(logits, labels) + 0.3 * self._loss_criterion(aux_logits, labels)
         else:
@@ -55,3 +58,13 @@ class Trainer(basic.Trainer):
         self.optimizer.step()
 
         return loss
+
+    def get_train_loader(self, batch_size, trainset, sampler, **kwargs):
+        """
+        针对 BN 层可能的报错：
+        “ValueError: Expected more than 1 value per channel when training, got input size torch.Size([1, 768, 1, 1])”
+        重写 basie.Trainer 中的 get_train_loader 方法
+        """
+        return torch.utils.data.DataLoader(
+            dataset=trainset, shuffle=False, batch_size=batch_size, sampler=sampler, drop_last=True # 防止 BN 层报错
+        )
